@@ -11,6 +11,6 @@ RUN uv pip install gunicorn psycopg2-binary
 
 COPY . .
 
-RUN python manage.py collectstatic --no-input
+RUN uv run manage.py collectstatic --no-input
 
 CMD [ "uv run gunicorn project.wsgi:application --bind 0.0.0.0:8000" ]
