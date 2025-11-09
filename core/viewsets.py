@@ -5,12 +5,13 @@ from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, LikeSerializer, LoginSerializer, RegisterSerializer
 from django.db.models import Count, Q, ExpressionWrapper, BooleanField
 from rest_framework.response import Response
+from django.http import HttpRequest
 
 class CommentViewSet(viewsets.ViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
 
-    def create(self, request):
+    def create(self, request: HttpRequest):
         cleaned_data = self.serializer_class(data = request.data)
         if not cleaned_data.is_valid():
             return Response(data = cleaned_data.errors, status = 400)
@@ -25,6 +26,24 @@ class CommentViewSet(viewsets.ViewSet):
         thread.comments.add(comment)
 
         return Response(data = cleaned_data.data)
+    
+    def destroy(self, request: HttpRequest, pk = None):
+        user = request.user
+        comment = Comment.objects.filter(pk = pk).first()
+        thread = Thread.objects.filter(comments__user__in = [user.pk]).first()
+
+        if comment is None or thread is None:
+            return Response(status = 404, data = {'detail': 'Komentar tidak ditemukan'})
+
+        can_destroyed = comment.user.pk == user.pk or \
+                        thread.owner.pk == user.pk
+        
+        if not can_destroyed:
+            return Response(status = 403, data = {'detail': 'Tidak bisa menghapus komentar ini'})
+        
+        # thread.comments
+        comment.delete()
+        return Response(status = 204, data = {})
 
 
 class LikeViewSet(viewsets.ViewSet):
