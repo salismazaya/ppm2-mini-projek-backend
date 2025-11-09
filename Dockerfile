@@ -7,7 +7,7 @@ COPY uv.lock .
 RUN uv python install
 RUN uv sync
 
-RUN uv pip install gunicorn
+RUN uv pip install gunicorn psycopg2-binary
 
 COPY . .
 
