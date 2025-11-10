@@ -3,8 +3,9 @@ from rest_framework.views import APIView
 from core.models import Comment, Thread, Like, User
 from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, LikeSerializer, LoginSerializer, RegisterSerializer
-from django.db.models import Count, Q, ExpressionWrapper, BooleanField
+from django.db.models import Count, Q, ExpressionWrapper, BooleanField, Subquery
 from rest_framework.response import Response
+from rest_framework.authentication import TokenAuthentication
 from django.http import HttpRequest
 
 class CommentViewSet(viewsets.ViewSet):
@@ -48,8 +49,9 @@ class CommentViewSet(viewsets.ViewSet):
 
 class LikeViewSet(viewsets.ViewSet):
     serializer_class = LikeSerializer
+    authentication_classes = [TokenAuthentication]
 
-    def create(self, request):
+    def create(self, request: HttpRequest):
         cleaned_data = self.serializer_class(data = request.data)
         if not cleaned_data.is_valid():
             return Response(data = cleaned_data.errors, status = 400)
@@ -78,15 +80,20 @@ class ThreadViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = ThreadSerializer
 
+    # def 
+
     def get_queryset(self):
         user = self.request.user
+
         queryset = self.queryset.annotate(
             liked = ExpressionWrapper(
-                Count('likes', filter = Q(likes__user__in = [user.pk])),
+                Count('likes', filter = Q(likes__users__in = user.pk)),
                 output_field = BooleanField()
             )
         )
         return queryset
+
+    
     
 class LoginViewSet(APIView):
     permission_classes = [~permissions.IsAuthenticated]
