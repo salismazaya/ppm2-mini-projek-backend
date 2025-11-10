@@ -18,6 +18,9 @@ class Thread(models.Model):
     #     db_persist = False
     # )
 
+    def __str__(self):
+        return f"<Thread {self.pk}: {self.text[:20]}>"
+
     @property
     def comments(self):
         return Comment.objects.filter(thread__pk = self.pk)

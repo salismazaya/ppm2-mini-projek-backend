@@ -4,7 +4,7 @@ from core.models import Comment, Thread, Like, User
 from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, \
     LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer
-from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, Value, F
+from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, F
 from django.db.models.functions import Coalesce
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
@@ -133,8 +133,8 @@ class ThreadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         order_by = self.request.GET.get('order', 'recent')
-
         user = self.request.user
+
         queryset = self.queryset.annotate(
             liked = Exists(
                 Like.objects.filter(user__pk = user.pk).filter(thread__pk = OuterRef('pk'))[:1]
@@ -145,12 +145,10 @@ class ThreadViewSet(viewsets.ModelViewSet):
             queryset = queryset.annotate(
                 score = F('comments_count') + F('likes_count')
             ).order_by('-score')
+        else:
+            queryset = queryset.order_by('-id')
 
         return queryset
-    
-    def list(self, request: HttpRequest, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
     
     
 class LoginViewSet(APIView):

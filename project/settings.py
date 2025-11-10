@@ -90,7 +90,6 @@ DATABASES = {
 import dj_database_url
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
-
 if DATABASE_URL:
     DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
 
@@ -117,9 +116,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'id-ID'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Jakarta'
 
 USE_I18N = True
 
@@ -154,7 +153,7 @@ REST_FRAMEWORK = {
     
 }
 
-APPEND_SLASH = False
+# APPEND_SLASH = False
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
