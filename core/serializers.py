@@ -32,7 +32,7 @@ class UserEditSerializer(serializers.Serializer):
 class CommentMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('user', 'text')
+        fields = ('id', 'user', 'text')
 
     user = UserSerializer(read_only = True)
 
