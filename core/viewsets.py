@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from core.models import Comment, Thread, Like, User
 from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, \
-    LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer
+    LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer, UserSerializer
 from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, F
 from django.db.models.functions import Coalesce
 from rest_framework.response import Response
@@ -17,7 +17,7 @@ class UserViewSet(APIView):
 
     def get(self, request: HttpRequest, format = None):
         user = request.user
-        serializer = UserEditSerializer(data = model_to_dict(user))
+        serializer = UserSerializer(data = model_to_dict(user))
         serializer.is_valid()
         return Response(data = serializer.data)
     
