@@ -17,11 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include, re_path
 from core.routers import router
-from core.viewsets import LoginViewSet, RegisterViewset
+from core.viewsets import LoginViewSet, RegisterViewset, UserViewSet
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     re_path(r'^api/login/?$', LoginViewSet.as_view()),
+    re_path(r'^api/user/?$', UserViewSet.as_view()),
     re_path(r'^api/register/?$', RegisterViewset.as_view())
 ]

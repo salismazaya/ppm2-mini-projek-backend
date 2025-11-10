@@ -2,29 +2,59 @@ from rest_framework import viewsets, permissions
 from rest_framework.views import APIView
 from core.models import Comment, Thread, Like, User
 from rest_framework.authtoken.models import Token
-from core.serializers import CommentSerializer, ThreadSerializer, LikeSerializer, LoginSerializer, RegisterSerializer
-from django.db.models import Count, Q, ExpressionWrapper, BooleanField, Subquery
+from core.serializers import CommentSerializer, ThreadSerializer, \
+    LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer
+from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, Value, F
+from django.db.models.functions import Coalesce
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
 from django.http import HttpRequest
+from django.forms import model_to_dict
+
+
+class UserViewSet(APIView):
+    authentication_classes = [TokenAuthentication]
+
+    def get(self, request: HttpRequest, format = None):
+        user = request.user
+        serializer = UserEditSerializer(data = model_to_dict(user))
+        serializer.is_valid()
+        return Response(data = serializer.data)
+    
+    def put(self, request: HttpRequest):
+        user = request.user
+        serializer = UserEditSerializer(data = request.data)
+        
+        if not serializer.is_valid():
+            return Response(data = serializer.errors, status = 400)
+
+        username = serializer.data.get('username')
+        if user.username != username:
+            is_username_exists = User.objects.filter(username = serializer.data['username']).exists()
+            if is_username_exists:
+                return Response(data = {'detail': 'Username sudah digunakan'}, status = 403)
+
+        User.objects.filter(pk = user.pk).update(**serializer.data)
+        return Response(status = 200, data = {'status': 'OK'})
+
 
 class CommentViewSet(viewsets.ViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
+    authentication_classes = [TokenAuthentication]
 
     def create(self, request: HttpRequest):
         cleaned_data = self.serializer_class(data = request.data)
         if not cleaned_data.is_valid():
             return Response(data = cleaned_data.errors, status = 400)
-
-        comment = self.queryset.model.objects.create(
-            user = request.user,
-            text = cleaned_data['text'].value
-        )
-
+        
         thread_id = cleaned_data['thread'].value
-        thread = Thread.objects.get(pk = thread_id)
-        thread.comments.add(comment)
+
+        self.queryset.model.objects.create(
+            user = request.user,
+            text = cleaned_data['text'].value,
+            thread_id = thread_id
+        )
 
         return Response(data = cleaned_data.data)
     
@@ -57,41 +87,69 @@ class LikeViewSet(viewsets.ViewSet):
             return Response(data = cleaned_data.errors, status = 400)
  
         thread_id = cleaned_data['thread'].value
-        thread = Thread.objects.filter(pk = thread_id).first()
+        # thread = Thread.objects.filter(pk = thread_id).first()
 
-        if thread.likes.filter(user__pk = request.user.pk).exists():
+        if Like.objects.filter(
+            user__pk = request.user.pk,
+            thread__pk = thread_id,
+        ).exists():
             return Response(data = {'detail': 'Sudah di-like'}, status = 403)
 
-        like = Like.objects.create(user = request.user)
-        thread.likes.add(like)
+        Like.objects.create(user = request.user, thread_id = thread_id)
+        # thread.likes.add(like)
 
         return Response(data = cleaned_data.data)
 
     def destroy(self, request, pk = None):
-        # Like.objects.filter(pk = pk).delete()
-        Thread.objects.get(pk = pk).likes.filter(user__pk = request.user.pk).delete()
-        return Response(status = 204)
+        Like.objects.filter(user__pk = request.user.pk, thread__pk = pk).delete()
+        # Thread.objects.get(pk = pk).likes.filter(user__pk = request.user.pk).delete()
+        return Response(status = 204, data = {})
+
+
+likes_subquery = (
+    Like.objects
+        .filter(thread__pk = OuterRef('pk'))
+        .values('thread')
+        .annotate(count = Count('pk'))
+        .values('count')
+)
+
+comments_subquery = (
+    Comment.objects
+        .filter(thread__pk = OuterRef('pk'))
+        .values('thread')
+        .annotate(count = Count('pk'))
+        .values('count')
+)
 
 
 class ThreadViewSet(viewsets.ModelViewSet):
     queryset = Thread.objects.annotate(
-        likes_count = Count('likes'),
-        comments_count = Count('comments'),
+        likes_count = Coalesce(Subquery(likes_subquery, output_field = IntegerField()), 0),
+        comments_count = Coalesce(Subquery(comments_subquery, output_field = IntegerField()), 0),
     ).all()
     serializer_class = ThreadSerializer
-
-    # def 
+    authentication_classes = [TokenAuthentication]
 
     def get_queryset(self):
-        user = self.request.user
+        order_by = self.request.GET.get('order', 'recent')
 
+        user = self.request.user
         queryset = self.queryset.annotate(
-            liked = ExpressionWrapper(
-                Count('likes', filter = Q(likes__users__in = user.pk)),
-                output_field = BooleanField()
+            liked = Exists(
+                Like.objects.filter(user__pk = user.pk).filter(thread__pk = OuterRef('pk'))[:1]
             )
         )
+
+        if order_by == "trending":
+            queryset = queryset.annotate(
+                score = F('comments_count') + F('likes_count')
+            ).order_by('-score')
+
         return queryset
+    
+    def list(self, request: HttpRequest, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     
     

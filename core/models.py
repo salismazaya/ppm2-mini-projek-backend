@@ -2,20 +2,11 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
-class Like(models.Model):
-    user = models.ForeignKey(User, on_delete = models.CASCADE)
-
-
-class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete = models.CASCADE)
-    text = models.TextField()
-
-
 class Thread(models.Model):
     owner = models.ForeignKey(User, on_delete = models.CASCADE)
     text = models.TextField()
-    likes = models.ManyToManyField(Like, blank = True)
-    comments = models.ManyToManyField(Comment, blank = True)
+    # likes = models.ManyToManyField(Like, blank = True)
+    # comments = models.ManyToManyField(Comment, blank = True)
     # likes_count = models.GeneratedField(
     #     expression = models.Count('likes'),
     #     output_field = models.PositiveIntegerField(),
@@ -27,5 +18,20 @@ class Thread(models.Model):
     #     db_persist = False
     # )
 
+    @property
+    def comments(self):
+        return Comment.objects.filter(thread__pk = self.pk)
 
 
+class Like(models.Model):
+    class Meta:
+        unique_together = ('user', 'thread')
+
+    user = models.ForeignKey(User, on_delete = models.CASCADE)
+    thread = models.ForeignKey(Thread, on_delete = models.CASCADE)
+
+
+class Comment(models.Model):
+    user = models.ForeignKey(User, on_delete = models.CASCADE)
+    text = models.TextField()
+    thread = models.ForeignKey(Thread, on_delete = models.CASCADE)

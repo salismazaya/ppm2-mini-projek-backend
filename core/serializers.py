@@ -19,6 +19,16 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'username', 'first_name', 'last_name')
 
 
+class UserEditSerializer(serializers.Serializer):
+    # class Meta:
+    #     model = User
+    #     fields = ('id', 'username', 'first_name', 'last_name')
+    username = serializers.CharField(required = False)
+    first_name = serializers.CharField(required = False)
+    last_name = serializers.CharField(required = False)
+
+
+
 class CommentMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
@@ -47,7 +57,6 @@ class ThreadSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['owner'] = self.context.get('request').user
         return super().create(validated_data)
-
 
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
