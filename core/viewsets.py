@@ -62,7 +62,7 @@ class CommentViewSet(viewsets.ViewSet):
     def destroy(self, request: HttpRequest, pk = None):
         user = request.user
         comment = Comment.objects.filter(pk = pk).first()
-        thread = Thread.objects.filter(comments__user__in = [user.pk]).first()
+        thread = comment.thread
 
         if comment is None or thread is None:
             return Response(status = 404, data = {'detail': 'Komentar tidak ditemukan'})
