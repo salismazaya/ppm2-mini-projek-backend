@@ -19,7 +19,8 @@ class UserViewSet(APIView):
         user = request.user
         serializer = UserSerializer(data = model_to_dict(user))
         serializer.is_valid()
-        return Response(data = serializer.data)
+
+        return Response(data = {**serializer.data, 'id': user.pk})
     
     def put(self, request: HttpRequest):
         user = request.user

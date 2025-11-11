@@ -23,6 +23,7 @@ class UserEditSerializer(serializers.Serializer):
     # class Meta:
     #     model = User
     #     fields = ('id', 'username', 'first_name', 'last_name')
+    id = serializers.IntegerField(read_only = True)
     username = serializers.CharField(required = False)
     first_name = serializers.CharField(required = False)
     last_name = serializers.CharField(required = False)
