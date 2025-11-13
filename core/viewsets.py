@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.views import APIView
-from core.models import Comment, Thread, Like, User
+from core.models import Comment, Thread, Like, User, PhotoProfile
 from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, \
     LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer, UserSerializer
@@ -8,34 +8,79 @@ from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, F
 from django.db.models.functions import Coalesce
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
+from core.helpers import appscript_storage
 from django.forms import model_to_dict
+from core.helpers import appscript_storage
+from django.conf import settings
+import base64
 
 
 class UserViewSet(APIView):
     authentication_classes = [TokenAuthentication]
 
-    def get(self, request: HttpRequest, format = None):
-        user = request.user
-        serializer = UserSerializer(data = model_to_dict(user))
-        serializer.is_valid()
+    class UserProfiledProxy:
+        def __init__(self, user):
+            self.__user = user
 
-        return Response(data = {**serializer.data, 'id': user.pk})
+        def __getattr__(self, key):
+            return getattr(self.__user, key)
+        
+        @property
+        def photo(self):
+            pp = PhotoProfile.objects.filter(user__pk = self.__user.pk).first()
+            if pp is None:
+                return
+            
+            return pp.media_id
+        
+        def update_photo(self, file_id: str):
+            # print(self.__user)
+            PhotoProfile.objects.update_or_create(user__pk = self.__user.pk, defaults = {
+                'user_id': self.__user.pk,
+                'media_id': file_id
+            })
+
+    def get(self, request: HttpRequest, format = None):
+        user = UserViewSet.UserProfiledProxy(request.user)
+
+        serializer = UserSerializer(data = model_to_dict(user))
+        serializer.is_valid() # always valid
+
+        result = {
+            'photo': user.photo,
+            'id': user.pk,
+            **serializer.data
+        }
+
+        return Response(data = result)
     
     def put(self, request: HttpRequest):
-        user = request.user
+        user = UserViewSet.UserProfiledProxy(request.user)
         serializer = UserEditSerializer(data = request.data)
         
         if not serializer.is_valid():
             return Response(data = serializer.errors, status = 400)
+        
+        photo = serializer.data.get('photo')
+        data = {**serializer.data}
 
-        username = serializer.data.get('username')
-        if user.username != username:
-            is_username_exists = User.objects.filter(username = serializer.data['username']).exists()
+        username = data.get('username')
+        if user.username != username and username:
+            is_username_exists = User.objects.filter(username = username).exists()
             if is_username_exists:
                 return Response(data = {'detail': 'Username sudah digunakan'}, status = 403)
 
-        User.objects.filter(pk = user.pk).update(**serializer.data)
+        if photo:
+            photo_bytes = base64.b64decode(photo)
+            file = appscript_storage.upload_file(photo_bytes, serializer.data.get('photo_extension'))
+
+            user.update_photo(file.file_id)
+
+            del data['photo']
+            del data['photo_extension']
+
+        User.objects.filter(pk = user.pk).update(**data)
         return Response(status = 200, data = {'status': 'OK'})
 
 
@@ -151,6 +196,9 @@ class ThreadViewSet(viewsets.ModelViewSet):
 
         return queryset
     
+    def create(self, request: HttpRequest, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+    
     
 class LoginViewSet(APIView):
     permission_classes = [~permissions.IsAuthenticated]
@@ -205,3 +253,14 @@ class RegisterViewset(APIView):
         return Response(status = 201, data = {})
 
         
+class FileViewset(APIView):
+    def get(self, request: HttpRequest):
+        file_id = request.GET['id']
+        download = appscript_storage.download_file(file_id)
+        
+        response = HttpResponse(content = download.data, content_type = download.mimetype)
+
+        if not download.mimetype.startswith('image/'):
+            response.headers['Content-Dispotion'] = 'attachment; filename="%s"' % download.filename
+
+        return response
