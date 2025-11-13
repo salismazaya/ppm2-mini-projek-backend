@@ -25,5 +25,5 @@ urlpatterns = [
     re_path(r'^api/login/?$', LoginViewSet.as_view()),
     re_path(r'^api/user/?$', UserViewSet.as_view()),
     re_path(r'^api/register/?$', RegisterViewset.as_view()),
-    re_path(r'^api/file/?$', FileViewset.as_view()),
+    path('uploads/<str:filename>/', FileViewset.as_view()),
 ]

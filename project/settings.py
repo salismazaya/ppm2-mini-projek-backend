@@ -132,6 +132,9 @@ STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage"
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -167,3 +170,5 @@ SPECTACULAR_SETTINGS = {
 }
 
 APPSCRIPT_STORAGE_API = os.environ.get('APPSCRIPT_STORAGE_API')
+
+AUTH_USER_MODEL = 'core.User'

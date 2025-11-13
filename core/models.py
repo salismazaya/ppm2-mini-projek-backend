@@ -1,11 +1,10 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
 
-class PhotoProfile(models.Model):
-    user = models.OneToOneField(User, on_delete = models.CASCADE)
-    media_id = models.CharField(max_length = 255)
+class User(AbstractUser):
+    profile_picture = models.FileField(null = True, blank = True, upload_to = "uploads")
 
 
 class Thread(models.Model):
@@ -13,8 +12,8 @@ class Thread(models.Model):
     text = models.TextField()
     tags = models.CharField(null = True, blank = True, max_length = 255)
     title = models.CharField(max_length = 255, null = True, blank = True)
-    media_id = models.CharField(null = True, blank = True, max_length = 255)
-    created_at = models.DateTimeField(null = True, default = timezone.now)
+    file = models.FileField(null = True, blank = True, upload_to = "uploads")
+    created_at = models.DateTimeField(default = timezone.now)
 
     def __str__(self):
         return f"<Thread {self.pk}: {self.text[:20]}>"
@@ -30,11 +29,12 @@ class Like(models.Model):
 
     user = models.ForeignKey(User, on_delete = models.CASCADE)
     thread = models.ForeignKey(Thread, on_delete = models.CASCADE)
-    created_at = models.DateTimeField(null = True, default = timezone.now)
+    created_at = models.DateTimeField(default = timezone.now)
 
 
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete = models.CASCADE)
     text = models.TextField()
     thread = models.ForeignKey(Thread, on_delete = models.CASCADE)
-    created_at = models.DateTimeField(null = True, default = timezone.now)
+    file = models.FileField(null = True, blank = True, upload_to = "uploads")
+    created_at = models.DateTimeField(default = timezone.now)

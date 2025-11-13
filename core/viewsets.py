@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.views import APIView
-from core.models import Comment, Thread, Like, User, PhotoProfile
+from core.models import Comment, Thread, Like, User
 from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, \
     LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer, UserSerializer
@@ -8,47 +8,34 @@ from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, F
 from django.db.models.functions import Coalesce
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
-from django.http import HttpRequest, HttpResponse
-from core.helpers import appscript_storage
-from django.forms import model_to_dict
+from django.http import HttpRequest, HttpResponse,  Http404
+from rest_framework.parsers import MultiPartParser, FormParser
+from core.helpers.upload import handle_uploaded_file, get_random_new_filename
+
 from core.helpers import appscript_storage
 from django.conf import settings
-import base64
+from django.forms import model_to_dict
 
 
 class UserViewSet(APIView):
     authentication_classes = [TokenAuthentication]
-
-    class UserProfiledProxy:
-        def __init__(self, user):
-            self.__user = user
-
-        def __getattr__(self, key):
-            return getattr(self.__user, key)
-        
-        @property
-        def photo(self):
-            pp = PhotoProfile.objects.filter(user__pk = self.__user.pk).first()
-            if pp is None:
-                return
-            
-            return pp.media_id
-        
-        def update_photo(self, file_id: str):
-            # print(self.__user)
-            PhotoProfile.objects.update_or_create(user__pk = self.__user.pk, defaults = {
-                'user_id': self.__user.pk,
-                'media_id': file_id
-            })
+    # parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request: HttpRequest, format = None):
-        user = UserViewSet.UserProfiledProxy(request.user)
+        user = request.user
 
-        serializer = UserSerializer(data = model_to_dict(user))
+        data = model_to_dict(user)
+        
+        if data.get('profile_picture'):
+            data['profile_picture_url'] = data['profile_picture'].url
+            del data['profile_picture']
+
+        # print(data)
+        serializer = UserSerializer(data = data)
         serializer.is_valid() # always valid
 
+        # print(serializer.data['profile_picture'].url)
         result = {
-            'photo': user.photo,
             'id': user.pk,
             **serializer.data
         }
@@ -56,54 +43,62 @@ class UserViewSet(APIView):
         return Response(data = result)
     
     def put(self, request: HttpRequest):
-        user = UserViewSet.UserProfiledProxy(request.user)
-        serializer = UserEditSerializer(data = request.data)
+        user = request.user
+
+        data = request.FILES
+        data.update(request.data)
+
+        serializer = UserEditSerializer(data = data)
         
         if not serializer.is_valid():
             return Response(data = serializer.errors, status = 400)
-        
-        photo = serializer.data.get('photo')
-        data = {**serializer.data}
 
-        username = data.get('username')
+        serializer_data = serializer.data
+
+        username = serializer_data.get('username')
         if user.username != username and username:
             is_username_exists = User.objects.filter(username = username).exists()
             if is_username_exists:
                 return Response(data = {'detail': 'Username sudah digunakan'}, status = 403)
 
-        if photo:
-            photo_bytes = base64.b64decode(photo)
-            file = appscript_storage.upload_file(photo_bytes, serializer.data.get('photo_extension'))
+        profile_picture = data.get('profile_picture')
 
-            user.update_photo(file.file_id)
-
-            del data['photo']
-            del data['photo_extension']
+        if profile_picture:
+            filename = get_random_new_filename(profile_picture.name)
+            user.profile_picture.save(filename, profile_picture)
+            del data['profile_picture']
 
         User.objects.filter(pk = user.pk).update(**data)
         return Response(status = 200, data = {'status': 'OK'})
 
 
-class CommentViewSet(viewsets.ViewSet):
+class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     authentication_classes = [TokenAuthentication]
 
-    def create(self, request: HttpRequest):
-        cleaned_data = self.serializer_class(data = request.data)
-        if not cleaned_data.is_valid():
-            return Response(data = cleaned_data.errors, status = 400)
+    # def create(self, request: HttpRequest):
+    #     cleaned_data = self.serializer_class(data = request.data)
+    #     if not cleaned_data.is_valid():
+    #         return Response(data = cleaned_data.errors, status = 400)
         
-        thread_id = cleaned_data['thread'].value
+    #     thread_id = cleaned_data['thread'].value
 
-        self.queryset.model.objects.create(
-            user = request.user,
-            text = cleaned_data['text'].value,
-            thread_id = thread_id
-        )
+    #     self.queryset.model.objects.create(
+    #         user = request.user,
+    #         text = cleaned_data['text'].value,
+    #         thread_id = thread_id
+    #     )
 
-        return Response(data = cleaned_data.data)
+    #     return Response(data = cleaned_data.data)
     
+    def perform_create(self, serializer):
+        serializer.save(user_id = self.request.user.pk)
+
+    def update(self, request: HttpRequest, *args, **kwargs):
+        # return super().update(request, *args, **kwargs)
+        raise NotImplementedError
+
     def destroy(self, request: HttpRequest, pk = None):
         user = request.user
         comment = Comment.objects.filter(pk = pk).first()
@@ -146,7 +141,7 @@ class LikeViewSet(viewsets.ViewSet):
 
         return Response(data = cleaned_data.data)
 
-    def destroy(self, request, pk = None):
+    def destroy(self, request: HttpRequest, pk = None):
         Like.objects.filter(user__pk = request.user.pk, thread__pk = pk).delete()
         # Thread.objects.get(pk = pk).likes.filter(user__pk = request.user.pk).delete()
         return Response(status = 204, data = {})
@@ -176,6 +171,7 @@ class ThreadViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = ThreadSerializer
     authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         order_by = self.request.GET.get('order', 'recent')
@@ -250,17 +246,24 @@ class RegisterViewset(APIView):
         new_user.set_password(password)
         new_user.save()
 
-        return Response(status = 201, data = {})
+        return Response(status = 201, data = {'status': 'OK'})
 
+import mimetypes
         
 class FileViewset(APIView):
-    def get(self, request: HttpRequest):
-        file_id = request.GET['id']
-        download = appscript_storage.download_file(file_id)
-        
-        response = HttpResponse(content = download.data, content_type = download.mimetype)
+    def get(self, request: HttpRequest, filename: str):
+        filepath = settings.BASE_DIR / ("uploads/" + filename)
 
-        if not download.mimetype.startswith('image/'):
-            response.headers['Content-Dispotion'] = 'attachment; filename="%s"' % download.filename
+        try:
+            with open(filepath, 'rb') as f:
+                content = f.read()
+                content_type, _ = mimetypes.guess_type(filepath)
 
-        return response
+                response = HttpResponse(content = content, content_type = content_type)
+
+                if not content_type.startswith('image/'):
+                    response.headers['Content-Dispotion'] = 'attachment; filename="%s"' % filename
+
+                return response
+        except (FileNotFoundError, FileExistsError):
+            raise Http404

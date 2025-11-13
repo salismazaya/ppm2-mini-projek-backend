@@ -23,7 +23,7 @@ class DownloadSuccess:
     mimetype: str
 
 
-def upload_file(data: bytes, extension: str) -> UploadSuccess:
+def upload_file(filename: str, data: bytes, extension: str) -> UploadSuccess:
     mimetype = mimetypes.guess_type("mantap." + extension)[0]
     payload = {
         'extension': extension,

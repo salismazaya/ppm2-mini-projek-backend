@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from core.models import User, Comment, Like, Thread
+import mimetypes
 
 
 class LoginSerializer(serializers.Serializer):
@@ -16,25 +17,42 @@ class RegisterSerializer(serializers.Serializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'first_name', 'last_name', 'photo')
+        fields = ('id', 'username', 'first_name', 'last_name', 'profile_picture', 'profile_picture_url')
 
-    photo = serializers.CharField(required = False)
-
-
-class UserEditSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only = True)
+    profile_picture = serializers.FileField(write_only = True, required = False)
+    profile_picture_url = serializers.CharField(required = False)
+
+    def validate_profile_picture(self, value):
+        allowed_types = ['image/jpeg', 'image/png', 'image/webp']
+
+        # value adalah InMemoryUploadedFile atau TemporaryUploadedFile
+        mime_type = mimetypes.guess_type(value.name)[0]
+
+        if mime_type not in allowed_types:
+            raise serializers.ValidationError(
+                f"Invalid file type: {mime_type}. Allowed types: {', '.join(allowed_types)}"
+            )
+
+        # (opsional) batas ukuran file
+        max_size = 2 * 1024 * 1024  # 2 MB
+        if value.size > max_size:
+            raise serializers.ValidationError("File too large. Max size is 2MB.")
+
+        return value
+
+
+class UserEditSerializer(UserSerializer):
     username = serializers.CharField(required = False)
     first_name = serializers.CharField(required = False)
     last_name = serializers.CharField(required = False)
-    photo = serializers.CharField(required = False)
-    photo_extension = serializers.CharField(required = False)
-
+    profile_picture_url = serializers.CharField(required = False, read_only = True)
 
 
 class CommentMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('id', 'user', 'text', 'created_at')
+        fields = ('id', 'user', 'text', 'created_at', 'file')
         read_only_fields = ('id', 'created_at')
 
     user = UserSerializer(read_only = True)
@@ -52,15 +70,14 @@ class FileSerializer(serializers.Serializer):
 class ThreadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Thread
-        fields = ('id', 'owner', 'title', 'text', 'comments', 'likes_count', 'comments_count', 'liked', 'created_at', 'media_id', 'media')
-        read_only_fields = ('comments', 'likes_count', 'comments_count', 'liked', 'created_at', 'media_id')
+        fields = ('id', 'owner', 'title', 'text', 'comments', 'likes_count', 'comments_count', 'liked', 'created_at', 'file')
+        read_only_fields = ('comments', 'likes_count', 'comments_count', 'liked', 'created_at', )
     
     likes_count = serializers.IntegerField(read_only = True)
     comments_count = serializers.IntegerField(read_only = True)
     comments = serializers.ListSerializer(child = CommentMinimalSerializer(), read_only = True)
     owner = UserSerializer(read_only = True)
     liked = serializers.BooleanField(read_only = True)
-    media = FileSerializer(required = False, write_only = True)
 
     def create(self, validated_data):
         validated_data['owner'] = self.context.get('request').user
@@ -70,11 +87,10 @@ class ThreadSerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('id', 'user', 'thread', 'text', 'created_at', 'media', 'media_id')
-        read_only_fields = ('id', 'created_at', 'media_id')
+        fields = ('id', 'user', 'thread', 'text', 'created_at', 'file')
+        read_only_fields = ('id', 'created_at',)
 
     user = UserSerializer(read_only = True)
-    thread = serializers.IntegerField()
-    media = FileSerializer(required = False, write_only = True)
+    # thread = serializers.IntegerField()
 
         
