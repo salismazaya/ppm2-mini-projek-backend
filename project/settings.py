@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework.authtoken',
-    'drf_spectacular',
+    # 'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -157,10 +157,6 @@ REST_FRAMEWORK = {
 }
 
 # APPEND_SLASH = False
-
-REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-}
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Your Project API',

@@ -21,9 +21,9 @@ from core.viewsets import LoginViewSet, RegisterViewset, UserViewSet, FileViewse
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
     re_path(r'^api/login/?$', LoginViewSet.as_view()),
     re_path(r'^api/user/?$', UserViewSet.as_view()),
     re_path(r'^api/register/?$', RegisterViewset.as_view()),
+    path('api/', include(router.urls)),
     path('uploads/<str:filename>/', FileViewset.as_view()),
 ]

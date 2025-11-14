@@ -75,13 +75,9 @@ class ThreadSerializer(serializers.ModelSerializer):
     
     likes_count = serializers.IntegerField(read_only = True)
     comments_count = serializers.IntegerField(read_only = True)
-    comments = serializers.ListSerializer(child = CommentMinimalSerializer(), read_only = True)
+    comments = CommentMinimalSerializer(many = True, read_only = True)
     owner = UserSerializer(read_only = True)
     liked = serializers.BooleanField(read_only = True)
-
-    def create(self, validated_data):
-        validated_data['owner'] = self.context.get('request').user
-        return super().create(validated_data)
 
 
 class CommentSerializer(serializers.ModelSerializer):

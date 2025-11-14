@@ -18,10 +18,6 @@ class Thread(models.Model):
     def __str__(self):
         return f"<Thread {self.pk}: {self.text[:20]}>"
 
-    @property
-    def comments(self):
-        return Comment.objects.filter(thread__pk = self.pk)
-
 
 class Like(models.Model):
     class Meta:
@@ -35,6 +31,6 @@ class Like(models.Model):
 class Comment(models.Model):
     user = models.ForeignKey(User, on_delete = models.CASCADE)
     text = models.TextField()
-    thread = models.ForeignKey(Thread, on_delete = models.CASCADE)
+    thread = models.ForeignKey(Thread, on_delete = models.CASCADE, related_name = 'comments')
     file = models.FileField(null = True, blank = True, upload_to = "uploads")
     created_at = models.DateTimeField(default = timezone.now)

@@ -31,6 +31,9 @@ class UserViewSet(APIView):
             del data['profile_picture']
 
         # print(data)
+        if not data.get('profile_picture').name:
+            del data['profile_picture'
+                     ]
         serializer = UserSerializer(data = data)
         serializer.is_valid() # always valid
 
@@ -168,10 +171,13 @@ class ThreadViewSet(viewsets.ModelViewSet):
     queryset = Thread.objects.annotate(
         likes_count = Coalesce(Subquery(likes_subquery, output_field = IntegerField()), 0),
         comments_count = Coalesce(Subquery(comments_subquery, output_field = IntegerField()), 0),
-    ).all()
+    ).select_related('owner')
     serializer_class = ThreadSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        return serializer.save(owner_id = self.request.user.pk)
 
     def get_queryset(self):
         order_by = self.request.GET.get('order', 'recent')
@@ -191,9 +197,6 @@ class ThreadViewSet(viewsets.ModelViewSet):
             queryset = queryset.order_by('-id')
 
         return queryset
-    
-    def create(self, request: HttpRequest, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
     
     
 class LoginViewSet(APIView):
@@ -219,9 +222,8 @@ class LoginViewSet(APIView):
         token = Token.objects.create(user = user)
         return Response({'token': token.key})
 
-
 class RegisterViewset(APIView):
-    permission_classes = [~permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         serializer = RegisterSerializer(data = request.data)
@@ -236,7 +238,7 @@ class RegisterViewset(APIView):
         is_username_exists = User.objects.filter(username = username).exists()
         if is_username_exists:
             return Response(data = {'detail': 'Username sudah dipakai'}, status = 400)
-        
+    
         first_name, last_name = name.split(" ", 1)
         new_user = User(
             first_name = first_name,
