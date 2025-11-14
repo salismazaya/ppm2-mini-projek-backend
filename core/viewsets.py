@@ -47,9 +47,13 @@ class UserViewSet(APIView):
     
     def put(self, request: HttpRequest):
         user = request.user
-
+        
         data = request.FILES
-        data.update(request.data)
+        if not data:
+            data = request.data
+
+        else:
+            data.update(request.data)
 
         serializer = UserEditSerializer(data = data)
         
