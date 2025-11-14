@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include, re_path
 from core.routers import router
-from core.viewsets import LoginViewSet, RegisterViewset, UserViewSet, FileViewset
+from core.viewsets import LoginViewSet, RegisterViewset, UserViewSet, media_files
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -25,5 +25,5 @@ urlpatterns = [
     re_path(r'^api/user/?$', UserViewSet.as_view()),
     re_path(r'^api/register/?$', RegisterViewset.as_view()),
     path('api/', include(router.urls)),
-    path('uploads/<str:filename>/', FileViewset.as_view()),
+    path('uploads/<str:filename>/', media_files),
 ]

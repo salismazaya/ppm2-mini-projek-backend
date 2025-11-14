@@ -252,20 +252,20 @@ class RegisterViewset(APIView):
 
 import mimetypes
         
-class FileViewset(APIView):
-    def get(self, request: HttpRequest, filename: str):
-        filepath = settings.BASE_DIR / ("uploads/" + filename)
 
-        try:
-            with open(filepath, 'rb') as f:
-                content = f.read()
-                content_type, _ = mimetypes.guess_type(filepath)
+def media_files(request: HttpRequest, filename: str):
+    filepath = settings.BASE_DIR / ("uploads/" + filename)
 
-                response = HttpResponse(content = content, content_type = content_type)
+    try:
+        with open(filepath, 'rb') as f:
+            content = f.read()
+            content_type, _ = mimetypes.guess_type(filepath)
 
-                if not content_type.startswith('image/'):
-                    response.headers['Content-Dispotion'] = 'attachment; filename="%s"' % filename
+            response = HttpResponse(content = content, content_type = content_type)
 
-                return response
-        except (FileNotFoundError, FileExistsError):
-            raise Http404
+            if not content_type.startswith('image/'):
+                response.headers['Content-Dispotion'] = 'attachment; filename="%s"' % filename
+
+            return response
+    except (FileNotFoundError, FileExistsError):
+        raise Http404
