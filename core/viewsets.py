@@ -5,14 +5,14 @@ from rest_framework.authtoken.models import Token
 from core.serializers import CommentSerializer, ThreadSerializer, \
     LikeSerializer, LoginSerializer, RegisterSerializer, UserEditSerializer, UserSerializer
 from django.db.models import Count, Subquery, OuterRef, Exists, IntegerField, F
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Lower
 from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
 from django.http import HttpRequest, HttpResponse,  Http404
-from rest_framework.parsers import MultiPartParser, FormParser
-from core.helpers.upload import handle_uploaded_file, get_random_new_filename
+from core.helpers.upload import get_random_new_filename
+from django.db.models import Q
 
-from core.helpers import appscript_storage
+# from core.helpers import appscript_storage
 from django.conf import settings
 from django.forms import model_to_dict
 
@@ -185,6 +185,8 @@ class ThreadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         order_by = self.request.GET.get('order', 'recent')
+        query = self.request.GET.get('query')
+        
         user = self.request.user
 
         queryset = self.queryset.annotate(
@@ -192,6 +194,19 @@ class ThreadViewSet(viewsets.ModelViewSet):
                 Like.objects.filter(user__pk = user.pk).filter(thread__pk = OuterRef('pk'))[:1]
             )
         )
+
+        if query:
+            query = query.lower()
+
+            queryset = queryset.annotate(
+                text_lower = Lower('text')
+            ).annotate(
+                title_lower = Lower('text')
+            )
+
+            queryset = queryset.filter(
+                Q(text_lower__contains = query) | Q(title_lower__contains = query)
+            )
 
         if order_by == "trending":
             queryset = queryset.annotate(

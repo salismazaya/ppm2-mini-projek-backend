@@ -1,6 +1,7 @@
 from django.contrib import admin
-
-from core.models import Comment, Thread, Like
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import Group
+from core.models import Comment, Thread, Like, User
 
 class LikeInline(admin.StackedInline):
     model = Like
@@ -27,6 +28,9 @@ class LikeAdmin(admin.ModelAdmin):
     search_fields = ('thread__text', 'user__username', 'user__first_name', 'user__last_name')
 
 
+admin.site.register(User, UserAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(Thread, ThreadAdmin)
 admin.site.register(Like, LikeAdmin)
+
+admin.site.unregister(Group)
